@@ -1,4 +1,5 @@
 import React from "react";
+import WalletConnect from "./WalletConnect";
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -16,6 +17,30 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
 
       {/* Content */}
       <div className="relative z-10">
+        {/* Navigation */}
+        <nav className="bg-black/40 backdrop-blur-md border-b border-purple-500/30 sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 flex items-center justify-center animate-pulse-glow">
+                  <span className="text-2xl">🛸</span>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold cosmic-text">
+                    Solana Bandwidth Exchange
+                  </h1>
+                  <p className="text-xs text-purple-300">
+                    Decentralized Bandwidth Marketplace
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <WalletConnect />
+              </div>
+            </div>
+          </div>
+        </nav>
+
         {/* Hero Section */}
         <section className="min-h-screen flex items-center justify-center px-4">
           <div className="max-w-6xl mx-auto text-center">
@@ -39,19 +64,49 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
               </p>
             </div>
 
+            {/* Wallet Connection CTA */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <button
-                onClick={onGetStarted}
-                className="btn-space-primary text-lg px-8 py-4 rounded-full font-semibold"
+              <div className="flex flex-col items-center gap-4">
+                <WalletConnect />
+                <p className="text-sm text-gray-400">
+                  Connect your wallet to start trading bandwidth
+                </p>
+              </div>
+              <a
+                href="#features"
+                className="btn-space-secondary text-lg px-8 py-4 rounded-full font-semibold"
               >
-                🚀 Launch Mission Control
-              </button>
-              <button className="btn-space-secondary text-lg px-8 py-4 rounded-full font-semibold">
                 📡 Learn More
-              </button>
+              </a>
             </div>
 
-            {/* Stats */}
+            {/* Demo Statistics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl mx-auto mb-16">
+              <div className="space-card hover-lift">
+                <div className="text-3xl mb-2">⚡</div>
+                <div className="text-3xl font-bold text-cyan-400">~400ms</div>
+                <div className="text-sm text-gray-400">Transaction Speed</div>
+              </div>
+              <div className="space-card hover-lift">
+                <div className="text-3xl mb-2">💎</div>
+                <div className="text-3xl font-bold text-purple-400">
+                  $0.00025
+                </div>
+                <div className="text-sm text-gray-400">Avg. Fee (SOL)</div>
+              </div>
+              <div className="space-card hover-lift">
+                <div className="text-3xl mb-2">🌌</div>
+                <div className="text-3xl font-bold text-pink-400">24/7</div>
+                <div className="text-sm text-gray-400">Network Uptime</div>
+              </div>
+              <div className="space-card hover-lift">
+                <div className="text-3xl mb-2">🚀</div>
+                <div className="text-3xl font-bold text-green-400">1000+</div>
+                <div className="text-sm text-gray-400">Validators Ready</div>
+              </div>
+            </div>
+
+            {/* Key Benefits */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
               <div className="space-card hover-lift">
                 <div className="text-3xl mb-2">⚡</div>
@@ -84,8 +139,152 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
           </div>
         </section>
 
+        {/* Demo Showcase */}
+        <section className="py-20 px-4 bg-black/20 backdrop-blur-sm border-y border-purple-500/30">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-4xl font-bold text-center mb-16 bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+              🎯 Live Demo Features
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              {/* Left Column - Screenshots/Demo */}
+              <div className="space-y-6">
+                <div className="space-card">
+                  <h3 className="text-2xl font-bold text-cyan-300 mb-4 flex items-center gap-2">
+                    <span>📊</span>
+                    <span>Mission Control Dashboard</span>
+                  </h3>
+                  <div className="bg-gradient-to-br from-purple-900/50 to-blue-900/50 rounded-lg p-6 border border-purple-500/30">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">
+                          Active Satellites:
+                        </span>
+                        <span className="text-cyan-400 font-bold">12</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Total Bandwidth:</span>
+                        <span className="text-purple-400 font-bold">
+                          2.4 Gbps
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Earnings:</span>
+                        <span className="text-green-400 font-bold">
+                          45.7 SOL
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Network Status:</span>
+                        <span className="text-green-400 font-bold flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                          Online
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-card">
+                  <h3 className="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
+                    <span>🎯</span>
+                    <span>Smart Auction System</span>
+                  </h3>
+                  <ul className="space-y-2 text-gray-400">
+                    <li className="flex items-center gap-2">
+                      <span className="text-green-400">✓</span>
+                      Automatic bid validation
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-green-400">✓</span>
+                      Instant refund system
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-green-400">✓</span>
+                      Validator-controlled closing
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-green-400">✓</span>
+                      Escrow protection
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Right Column - Technical Specs */}
+              <div className="space-y-6">
+                <div className="space-card">
+                  <h3 className="text-2xl font-bold text-yellow-300 mb-4 flex items-center gap-2">
+                    <span>⚙️</span>
+                    <span>Technical Excellence</span>
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-blue-400 rounded-full"></div>
+                      <span className="text-gray-300">
+                        Built on Solana (65k TPS)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+                      <span className="text-gray-300">
+                        Anchor Framework (Rust)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-cyan-400 rounded-full"></div>
+                      <span className="text-gray-300">
+                        Next.js + TypeScript
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                      <span className="text-gray-300">
+                        Real-time WebSocket updates
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-card">
+                  <h3 className="text-xl font-bold text-pink-300 mb-4 flex items-center gap-2">
+                    <span>🚀</span>
+                    <span>Performance Metrics</span>
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-cyan-400">
+                        &lt; 500ms
+                      </div>
+                      <div className="text-xs text-gray-400">Avg Response</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-400">
+                        99.9%
+                      </div>
+                      <div className="text-xs text-gray-400">Uptime</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-400">
+                        10Gbps
+                      </div>
+                      <div className="text-xs text-gray-400">Max Bandwidth</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-yellow-400">
+                        0.1%
+                      </div>
+                      <div className="text-xs text-gray-400">Platform Fee</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* How It Works */}
-        <section className="py-20 px-4">
+        <section id="features" className="py-20 px-4">
           <div className="max-w-6xl mx-auto">
             <h2 className="text-4xl font-bold text-center mb-16 bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
               🌟 How the Space Network Works
@@ -139,107 +338,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
           </div>
         </section>
 
-        {/* Features */}
-        <section className="py-20 px-4">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-4xl font-bold text-center mb-16 bg-gradient-to-r from-pink-400 to-cyan-400 bg-clip-text text-transparent">
-              ✨ Advanced Space Technologies
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <div className="space-card hover-lift">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
-                    <span className="text-xl">⚡</span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-blue-300">
-                    Lightning Fast
-                  </h3>
-                </div>
-                <p className="text-gray-400">
-                  Solana's high-speed blockchain ensures instant transaction
-                  processing and real-time auction updates.
-                </p>
-              </div>
-
-              <div className="space-card hover-lift">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
-                    <span className="text-xl">🔒</span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-green-300">
-                    Secure Escrow
-                  </h3>
-                </div>
-                <p className="text-gray-400">
-                  Smart contracts handle all payments with automatic escrow,
-                  ensuring secure transactions for all participants.
-                </p>
-              </div>
-
-              <div className="space-card hover-lift">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center">
-                    <span className="text-xl">🌐</span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-purple-300">
-                    Global Network
-                  </h3>
-                </div>
-                <p className="text-gray-400">
-                  Connect with validators and users across the entire Solana
-                  ecosystem for maximum bandwidth availability.
-                </p>
-              </div>
-
-              <div className="space-card hover-lift">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                    <span className="text-xl">📊</span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-yellow-300">
-                    Real-Time Analytics
-                  </h3>
-                </div>
-                <p className="text-gray-400">
-                  Track your earnings, bandwidth usage, and auction performance
-                  with comprehensive dashboard analytics.
-                </p>
-              </div>
-
-              <div className="space-card hover-lift">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-                    <span className="text-xl">🔄</span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-cyan-300">
-                    Auto-Refunds
-                  </h3>
-                </div>
-                <p className="text-gray-400">
-                  Automatic refund system ensures outbid participants get their
-                  SOL back instantly when someone places a higher bid.
-                </p>
-              </div>
-
-              <div className="space-card hover-lift">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center">
-                    <span className="text-xl">🎯</span>
-                  </div>
-                  <h3 className="text-lg font-semibold text-pink-300">
-                    Fair Auctions
-                  </h3>
-                </div>
-                <p className="text-gray-400">
-                  Transparent, time-based auctions with clear rules and
-                  validator-controlled closing mechanisms.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* CTA */}
         <section className="py-20 px-4">
           <div className="max-w-4xl mx-auto text-center">
@@ -247,15 +345,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
               🚀 Ready to Explore the Bandwidth Galaxy?
             </h2>
             <p className="text-xl text-gray-300 mb-8">
-              Join thousands of validators and users already trading bandwidth
-              on the most advanced decentralized network in the cosmos.
+              Connect your wallet to join the decentralized bandwidth
+              marketplace
             </p>
-            <button
-              onClick={onGetStarted}
-              className="btn-space-primary text-xl px-12 py-6 rounded-full font-semibold"
-            >
-              🛸 Launch Your Space Mission
-            </button>
+            <div className="flex justify-center">
+              <WalletConnect />
+            </div>
           </div>
         </section>
       </div>

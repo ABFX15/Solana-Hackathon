@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
 import { Tab } from "@headlessui/react";
 import SlotCard from "../../components/SlotCard";
 import SlotListingForm from "../../components/SlotListingForm";
@@ -12,60 +12,67 @@ import { SolanaProgram, BandwidthSlotData } from "../../lib/solana-program";
 
 export default function HomePage() {
   const wallet = useWallet();
+  const anchorWallet = useAnchorWallet();
   const [solanaProgram, setSolanaProgram] = useState<SolanaProgram | null>(
     null
   );
   const [slots, setSlots] = useState<BandwidthSlotData[]>([]);
-  const [bidModalOpen, setBidModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<BandwidthSlotData | null>(
     null
   );
-  const [isLoading, setIsLoading] = useState(false);
+  const [showBidModal, setShowBidModal] = useState(false);
+  const [loading, setLoading] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
   const [showLanding, setShowLanding] = useState(true);
 
   // Initialize Solana program when wallet connects
   useEffect(() => {
-    if (wallet.wallet && wallet.publicKey) {
+    if (anchorWallet && anchorWallet.publicKey) {
       setShowLanding(false);
-      const program = new SolanaProgram(wallet);
-      setSolanaProgram(program);
+      try {
+        console.log("Creating SolanaProgram with anchorWallet:", anchorWallet);
+        const program = new SolanaProgram(anchorWallet);
+        setSolanaProgram(program);
 
-      // Setup event listeners
-      const listeners = [
-        program.addEventListener("BandwidthListed", (event) => {
-          console.log("Bandwidth listed:", event);
-          fetchSlots();
-        }),
-        program.addEventListener("BidPlaced", (event) => {
-          console.log("Bid placed:", event);
-          fetchSlots();
-        }),
-        program.addEventListener("AuctionClosed", (event) => {
-          console.log("Auction closed:", event);
-          fetchSlots();
-        }),
-        program.addEventListener("FundsClaimed", (event) => {
-          console.log("Funds claimed:", event);
-          fetchSlots();
-        }),
-      ];
+        // Setup event listeners
+        const listeners = [
+          program.addEventListener("BandwidthListed", (event) => {
+            console.log("Bandwidth listed:", event);
+            fetchSlots();
+          }),
+          program.addEventListener("BidPlaced", (event) => {
+            console.log("Bid placed:", event);
+            fetchSlots();
+          }),
+          program.addEventListener("AuctionClosed", (event) => {
+            console.log("Auction closed:", event);
+            fetchSlots();
+          }),
+          program.addEventListener("FundsClaimed", (event) => {
+            console.log("Funds claimed:", event);
+            fetchSlots();
+          }),
+        ];
 
-      // Fetch initial slots
-      fetchSlots();
+        // Fetch initial slots
+        fetchSlots();
 
-      // Cleanup event listeners on unmount
-      return () => {
-        listeners.forEach((listener) => {
-          program.removeEventListener(listener);
-        });
-      };
+        // Cleanup event listeners on unmount
+        return () => {
+          listeners.forEach((listener) => {
+            program.removeEventListener(listener);
+          });
+        };
+      } catch (error) {
+        console.error("Failed to create SolanaProgram:", error);
+        setError("Failed to initialize Solana program");
+      }
     } else {
       setShowLanding(true);
       setSolanaProgram(null);
     }
-  }, [wallet.wallet, wallet.publicKey]);
+  }, [anchorWallet]);
 
   // Fetch slots when program is ready
   useEffect(() => {
@@ -97,7 +104,7 @@ export default function HomePage() {
       return;
     }
 
-    setIsLoading(true);
+    setLoading("Listing...");
     setError("");
 
     try {
@@ -116,7 +123,7 @@ export default function HomePage() {
       console.error("Error listing slot:", err);
       setError((err as Error).message || "Failed to list slot");
     } finally {
-      setIsLoading(false);
+      setLoading("");
     }
   };
 
@@ -126,7 +133,7 @@ export default function HomePage() {
       return;
     }
 
-    setIsLoading(true);
+    setLoading("Placing bid...");
     setError("");
 
     try {
@@ -140,7 +147,7 @@ export default function HomePage() {
       console.error("Error placing bid:", err);
       setError((err as Error).message || "Failed to place bid");
     } finally {
-      setIsLoading(false);
+      setLoading("");
     }
   };
 
@@ -150,7 +157,7 @@ export default function HomePage() {
       return;
     }
 
-    setIsLoading(true);
+    setLoading("Closing auction...");
     setError("");
 
     try {
@@ -164,7 +171,7 @@ export default function HomePage() {
       console.error("Error closing auction:", err);
       setError((err as Error).message || "Failed to close auction");
     } finally {
-      setIsLoading(false);
+      setLoading("");
     }
   };
 
@@ -174,7 +181,7 @@ export default function HomePage() {
       return;
     }
 
-    setIsLoading(true);
+    setLoading("Claiming funds...");
     setError("");
 
     try {
@@ -188,13 +195,13 @@ export default function HomePage() {
       console.error("Error claiming funds:", err);
       setError((err as Error).message || "Failed to claim funds");
     } finally {
-      setIsLoading(false);
+      setLoading("");
     }
   };
 
   const handleBidClick = (slotData: BandwidthSlotData) => {
     setSelectedSlot(slotData);
-    setBidModalOpen(true);
+    setShowBidModal(true);
   };
 
   const clearMessages = () => {
@@ -213,7 +220,7 @@ export default function HomePage() {
   }, [fetchSlots]);
 
   // Show landing page if not connected
-  if (showLanding && !wallet.publicKey) {
+  if (!anchorWallet?.publicKey) {
     return <LandingPage onGetStarted={handleGetStarted} />;
   }
 
@@ -394,18 +401,15 @@ export default function HomePage() {
               {/* Dashboard */}
               <Tab.Panel>
                 <Dashboard
-                  publicKey={wallet.publicKey}
+                  publicKey={anchorWallet?.publicKey}
                   slots={slots}
-                  isLoading={isLoading}
+                  isLoading={loading}
                 />
               </Tab.Panel>
 
               {/* List Bandwidth */}
               <Tab.Panel>
-                <SlotListingForm
-                  onList={handleListSlot}
-                  isLoading={isLoading}
-                />
+                <SlotListingForm onList={handleListSlot} isLoading={loading} />
               </Tab.Panel>
 
               {/* Active Auctions */}
@@ -418,9 +422,9 @@ export default function HomePage() {
                     <button
                       onClick={fetchSlots}
                       className="btn-space-secondary px-6 py-2 rounded-full text-sm"
-                      disabled={isLoading}
+                      disabled={loading}
                     >
-                      {isLoading ? (
+                      {loading ? (
                         <span className="loading loading-spinner loading-sm"></span>
                       ) : (
                         "🔄 Refresh"
@@ -447,11 +451,11 @@ export default function HomePage() {
                         <SlotCard
                           key={slot.publicKey.toString()}
                           slotData={slot}
-                          publicKey={wallet.publicKey}
+                          publicKey={anchorWallet?.publicKey}
                           onBid={handleBidClick}
                           onClose={handleCloseAuction}
                           onClaim={handleClaimFunds}
-                          isLoading={isLoading}
+                          isLoading={loading}
                         />
                       ))}
                     </div>
@@ -469,9 +473,9 @@ export default function HomePage() {
                     <button
                       onClick={fetchSlots}
                       className="btn-space-secondary px-6 py-2 rounded-full text-sm"
-                      disabled={isLoading}
+                      disabled={loading}
                     >
-                      {isLoading ? (
+                      {loading ? (
                         <span className="loading loading-spinner loading-sm"></span>
                       ) : (
                         "🔄 Refresh"
@@ -491,11 +495,11 @@ export default function HomePage() {
                           <SlotCard
                             key={slot.publicKey.toString()}
                             slotData={slot}
-                            publicKey={wallet.publicKey}
+                            publicKey={anchorWallet?.publicKey}
                             onBid={handleBidClick}
                             onClose={handleCloseAuction}
                             onClaim={handleClaimFunds}
-                            isLoading={isLoading}
+                            isLoading={loading}
                           />
                         ))}
                       </div>
@@ -514,18 +518,18 @@ export default function HomePage() {
                           <SlotCard
                             key={slot.publicKey.toString()}
                             slotData={slot}
-                            publicKey={wallet.publicKey}
+                            publicKey={anchorWallet?.publicKey}
                             onBid={handleBidClick}
                             onClose={handleCloseAuction}
                             onClaim={handleClaimFunds}
-                            isLoading={isLoading}
+                            isLoading={loading}
                           />
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {slots.length === 0 && !isLoading && (
+                  {slots.length === 0 && !loading && (
                     <div className="text-center py-16">
                       <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-500/20 to-cyan-500/20 flex items-center justify-center">
                         <span className="text-6xl">🚀</span>
@@ -548,11 +552,11 @@ export default function HomePage() {
 
       {/* Bid Modal */}
       <BidModal
-        open={bidModalOpen}
-        onClose={() => setBidModalOpen(false)}
+        open={showBidModal}
+        onClose={() => setShowBidModal(false)}
         onBid={handleBid}
         slotData={selectedSlot}
-        isLoading={isLoading}
+        isLoading={loading}
       />
     </div>
   );

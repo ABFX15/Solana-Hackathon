@@ -1,7 +1,9 @@
+"use client";
+
 import { AnchorProvider, Program, web3, BN, IdlAccounts } from "@coral-xyz/anchor";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { SolanaHack } from "../../target/types/solana_hack";
-import idl from "../../target/idl/solana_hack.json";
+import { IDL } from "./idl";
 
 const programId = new PublicKey("59NDRZgvKZGNT8Rb3J6ShHTkJQzmnrpUZgPCxDu7M47e");
 const network = "https://api.devnet.solana.com"; // Devnet network
@@ -14,21 +16,32 @@ export interface BandwidthSlotData {
     account: BandwidthSlot;
 }
 
-interface WalletInterface {
-    publicKey: PublicKey | null;
-    signTransaction?: (tx: web3.Transaction) => Promise<web3.Transaction>;
-    signAllTransactions?: (txs: web3.Transaction[]) => Promise<web3.Transaction[]>;
+interface AnchorWallet {
+    publicKey: PublicKey;
+    signTransaction(transaction: web3.Transaction): Promise<web3.Transaction>;
+    signAllTransactions(transactions: web3.Transaction[]): Promise<web3.Transaction[]>;
 }
 
 export class SolanaProgram {
     private program: Program<SolanaHack>;
     private provider: AnchorProvider;
 
-    constructor(wallet: WalletInterface) {
+    constructor(wallet: AnchorWallet) {
         this.provider = new AnchorProvider(connection, wallet, {
             commitment: "confirmed",
         });
-        this.program = new Program<SolanaHack>(idl as SolanaHack, programId, this.provider);
+
+        console.log("IDL:", IDL); // Debug log
+        console.log("Program ID:", programId.toString());
+        console.log("Wallet:", wallet);
+
+        try {
+            this.program = new Program<SolanaHack>(IDL as any, programId, this.provider);
+            console.log("Program created successfully!");
+        } catch (error) {
+            console.error("Error creating Program:", error);
+            throw error;
+        }
     }
 
     // List a new bandwidth slot
