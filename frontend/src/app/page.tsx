@@ -37,32 +37,33 @@ export default function HomePage() {
         program.addEventListener("BandwidthListed", (event) => {
           console.log("Bandwidth listed:", event);
           fetchSlots();
-          setSuccess("🚀 Bandwidth slot launched successfully!");
         }),
         program.addEventListener("BidPlaced", (event) => {
           console.log("Bid placed:", event);
           fetchSlots();
-          setSuccess("🎯 Bid placed successfully!");
         }),
         program.addEventListener("AuctionClosed", (event) => {
           console.log("Auction closed:", event);
           fetchSlots();
-          setSuccess("🔒 Auction closed successfully!");
         }),
         program.addEventListener("FundsClaimed", (event) => {
           console.log("Funds claimed:", event);
           fetchSlots();
-          setSuccess("💎 Funds claimed successfully!");
         }),
       ];
 
+      // Fetch initial slots
+      fetchSlots();
+
+      // Cleanup event listeners on unmount
       return () => {
-        // Cleanup event listeners
-        listeners.forEach((listener) => program.removeEventListener(listener));
+        listeners.forEach((listener) => {
+          program.removeEventListener(listener);
+        });
       };
     } else {
+      setShowLanding(true);
       setSolanaProgram(null);
-      setSlots([]);
     }
   }, [wallet.wallet, wallet.publicKey]);
 
