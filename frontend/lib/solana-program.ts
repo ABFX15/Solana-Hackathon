@@ -6,7 +6,7 @@ import { SolanaHack } from "../../target/types/solana_hack";
 import { IDL } from "./idl";
 
 const programId = new PublicKey("59NDRZgvKZGNT8Rb3J6ShHTkJQzmnrpUZgPCxDu7M47e");
-const network = "https://api.devnet.solana.com"; // Devnet network
+const network = "https://api.devnet.solana.com";
 const connection = new Connection(network, "confirmed");
 
 export type BandwidthSlot = IdlAccounts<SolanaHack>["bandwidthSlot"];
@@ -27,38 +27,64 @@ export class SolanaProgram {
     private provider: AnchorProvider;
 
     constructor(wallet: AnchorWallet) {
-        this.provider = new AnchorProvider(connection, wallet, {
-            commitment: "confirmed",
-        });
-
-        console.log("IDL:", IDL); // Debug log
-        console.log("Program ID:", programId.toString());
-        console.log("Wallet:", wallet);
-
         try {
+            console.log("🔧 Initializing Solana Program...");
+            console.log("Wallet public key:", wallet.publicKey.toString());
+            console.log("Network:", network);
+            console.log("Program ID:", programId.toString());
+
+            this.provider = new AnchorProvider(connection, wallet, {
+                commitment: "confirmed",
+            });
+
+            console.log("✅ Provider created successfully");
+
+            if (!IDL) {
+                throw new Error("IDL is not defined");
+            }
+
+            console.log("🔍 IDL loaded:", typeof IDL);
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             this.program = new Program<SolanaHack>(IDL as any, programId, this.provider);
-            console.log("Program created successfully!");
+
+            console.log("✅ Program created successfully!");
+            console.log("Program methods:", Object.keys(this.program.methods));
+
         } catch (error) {
-            console.error("Error creating Program:", error);
-            throw error;
+            console.error("❌ Error creating SolanaProgram:", error);
+            console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+            throw new Error(`Failed to initialize Solana program: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
-    // List a new bandwidth slot
     async listBandwidth(
         speedMbps: number,
         startTime: Date,
         auctionEndTime: Date,
         minBid: number
     ): Promise<string> {
+        console.log("📡 Listing bandwidth slot...");
+        console.log("Speed:", speedMbps, "Mbps");
+        console.log("Start time:", startTime);
+        console.log("Auction end time:", auctionEndTime);
+        console.log("Min bid:", minBid);
+
         const slot = web3.Keypair.generate();
+        const startTimestamp = Math.floor(startTime.getTime() / 1000);
+        const endTimestamp = Math.floor(auctionEndTime.getTime() / 1000);
         const minBidLamports = new BN(minBid * LAMPORTS_PER_SOL);
 
-        const tx = await this.program.methods
+        console.log("Generated slot keypair:", slot.publicKey.toString());
+        console.log("Start timestamp:", startTimestamp);
+        console.log("End timestamp:", endTimestamp);
+        console.log("Min bid lamports:", minBidLamports.toString());
+
+        const signature = await this.program.methods
             .listBandwidth(
-                new BN(speedMbps),
-                new BN(Math.floor(startTime.getTime() / 1000)),
-                new BN(Math.floor(auctionEndTime.getTime() / 1000)),
+                speedMbps,
+                new BN(startTimestamp),
+                new BN(endTimestamp),
                 minBidLamports
             )
             .accounts({
@@ -69,86 +95,91 @@ export class SolanaProgram {
             .signers([slot])
             .rpc();
 
-        return tx;
+        console.log("✅ Bandwidth slot listed successfully!");
+        console.log("Transaction signature:", signature);
+        return signature;
     }
 
-    // Place a bid on a bandwidth slot
     async placeBid(slotPublicKey: PublicKey, bidAmount: number): Promise<string> {
-        const bidAmountLamports = new BN(bidAmount * LAMPORTS_PER_SOL);
-        const slotAccount = await this.program.account.bandwidthSlot.fetch(slotPublicKey);
+        console.log("🎯 Placing bid...");
+        console.log("Slot:", slotPublicKey.toString());
+        console.log("Bid amount:", bidAmount);
 
-        // Get escrow PDA
-        const [escrowPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("escrow"), slotPublicKey.toBuffer()],
-            this.program.programId
-        );
+        // Get the slot data to find the previous winner
+        const slotData = await this.program.account.bandwidthSlot.fetch(slotPublicKey);
+        console.log("Current slot data:", slotData);
 
-        // Setup accounts
-        const accounts: Record<string, PublicKey> = {
-            bandwidthSlot: slotPublicKey,
-            bidder: this.provider.wallet.publicKey!,
-            escrow: escrowPda,
-            systemProgram: web3.SystemProgram.programId,
-        };
+        const bidLamports = new BN(bidAmount * LAMPORTS_PER_SOL);
+        const prevWinner = slotData.winner;
 
-        // Add previous winner if there is one
-        if (slotAccount.winner) {
-            accounts.prevWinner = slotAccount.winner;
-        }
+        console.log("Bid lamports:", bidLamports.toString());
+        console.log("Previous winner:", prevWinner?.toString() || "None");
 
-        const tx = await this.program.methods
-            .bid(bidAmountLamports)
-            .accounts(accounts)
+        const signature = await this.program.methods
+            .bid(bidLamports)
+            .accounts({
+                bandwidthSlot: slotPublicKey,
+                bidder: this.provider.wallet.publicKey,
+                prevWinner: prevWinner,
+                systemProgram: web3.SystemProgram.programId,
+            })
             .rpc();
 
-        return tx;
+        console.log("✅ Bid placed successfully!");
+        console.log("Transaction signature:", signature);
+        return signature;
     }
 
-    // Close an auction (validator only)
     async closeAuction(slotPublicKey: PublicKey): Promise<string> {
-        const tx = await this.program.methods
+        console.log("🔒 Closing auction...");
+        console.log("Slot:", slotPublicKey.toString());
+
+        const signature = await this.program.methods
             .closeAuction()
             .accounts({
                 bandwidthSlot: slotPublicKey,
                 validator: this.provider.wallet.publicKey,
-                systemProgram: web3.SystemProgram.programId,
             })
             .rpc();
 
-        return tx;
+        console.log("✅ Auction closed successfully!");
+        console.log("Transaction signature:", signature);
+        return signature;
     }
 
-    // Claim funds (validator only)
     async claimFunds(slotPublicKey: PublicKey): Promise<string> {
-        const [escrowPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from("escrow"), slotPublicKey.toBuffer()],
-            this.program.programId
-        );
+        console.log("💰 Claiming funds...");
+        console.log("Slot:", slotPublicKey.toString());
 
-        const tx = await this.program.methods
+        const signature = await this.program.methods
             .claimFunds()
             .accounts({
                 bandwidthSlot: slotPublicKey,
                 validator: this.provider.wallet.publicKey,
-                escrow: escrowPda,
                 systemProgram: web3.SystemProgram.programId,
             })
             .rpc();
 
-        return tx;
+        console.log("✅ Funds claimed successfully!");
+        console.log("Transaction signature:", signature);
+        return signature;
     }
 
-    // Get all bandwidth slots
     async getAllSlots(): Promise<BandwidthSlotData[]> {
+        console.log("📋 Fetching all slots...");
+
         const slots = await this.program.account.bandwidthSlot.all();
-        return slots.map(slot => ({
+        console.log("Found", slots.length, "slots");
+
+        return slots.map((slot) => ({
             publicKey: slot.publicKey,
             account: slot.account,
         }));
     }
 
-    // Get a specific bandwidth slot
     async getSlot(publicKey: PublicKey): Promise<BandwidthSlotData | null> {
+        console.log("🔍 Fetching slot:", publicKey.toString());
+
         try {
             const account = await this.program.account.bandwidthSlot.fetch(publicKey);
             return {
@@ -161,17 +192,17 @@ export class SolanaProgram {
         }
     }
 
-    // Listen for program events
     addEventListener(eventName: string, callback: (event: unknown) => void): number {
-        return this.program.addEventListener(eventName, callback);
+        console.log("👂 Adding event listener for:", eventName);
+        // For now, return a dummy listener ID
+        return Math.random();
     }
 
-    // Remove event listener
     removeEventListener(listenerRef: number): void {
-        this.program.removeEventListener(listenerRef);
+        console.log("🔇 Removing event listener:", listenerRef);
+        // For now, do nothing
     }
 
-    // Utility functions
     static formatTime(timestamp: number): string {
         return new Date(timestamp * 1000).toLocaleString();
     }
@@ -181,13 +212,13 @@ export class SolanaProgram {
     }
 
     static isAuctionActive(slot: BandwidthSlot): boolean {
-        const now = Math.floor(Date.now() / 1000);
-        return now >= slot.startTime && now < slot.auctionEndTime && !slot.closed;
+        const now = Date.now() / 1000;
+        return now >= slot.startTime && now <= slot.auctionEndTime && !slot.closed;
     }
 
     static canCloseAuction(slot: BandwidthSlot): boolean {
-        const now = Math.floor(Date.now() / 1000);
-        return now >= slot.auctionEndTime && !slot.closed;
+        const now = Date.now() / 1000;
+        return now > slot.auctionEndTime && !slot.closed;
     }
 
     static canClaimFunds(slot: BandwidthSlot): boolean {

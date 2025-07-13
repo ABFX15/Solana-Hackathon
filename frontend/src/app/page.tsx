@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import { useWallet, useAnchorWallet } from "@solana/wallet-adapter-react";
+import { useAnchorWallet } from "@solana/wallet-adapter-react";
 import { Tab } from "@headlessui/react";
 import SlotCard from "../../components/SlotCard";
 import SlotListingForm from "../../components/SlotListingForm";
@@ -11,7 +11,6 @@ import LandingPage from "../../components/LandingPage";
 import { SolanaProgram, BandwidthSlotData } from "../../lib/solana-program";
 
 export default function HomePage() {
-  const wallet = useWallet();
   const anchorWallet = useAnchorWallet();
   const [solanaProgram, setSolanaProgram] = useState<SolanaProgram | null>(
     null
@@ -25,6 +24,18 @@ export default function HomePage() {
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
   const [showLanding, setShowLanding] = useState(true);
+
+  const fetchSlots = useCallback(async () => {
+    if (!solanaProgram) return;
+
+    try {
+      const allSlots = await solanaProgram.getAllSlots();
+      setSlots(allSlots);
+    } catch (err: unknown) {
+      console.error("Error fetching slots:", err);
+      setError("Failed to fetch slots");
+    }
+  }, [solanaProgram]);
 
   // Initialize Solana program when wallet connects
   useEffect(() => {
@@ -55,9 +66,6 @@ export default function HomePage() {
           }),
         ];
 
-        // Fetch initial slots
-        fetchSlots();
-
         // Cleanup event listeners on unmount
         return () => {
           listeners.forEach((listener) => {
@@ -72,26 +80,14 @@ export default function HomePage() {
       setShowLanding(true);
       setSolanaProgram(null);
     }
-  }, [anchorWallet]);
+  }, [anchorWallet, fetchSlots]);
 
   // Fetch slots when program is ready
   useEffect(() => {
     if (solanaProgram) {
       fetchSlots();
     }
-  }, [solanaProgram]);
-
-  const fetchSlots = useCallback(async () => {
-    if (!solanaProgram) return;
-
-    try {
-      const allSlots = await solanaProgram.getAllSlots();
-      setSlots(allSlots);
-    } catch (err: unknown) {
-      console.error("Error fetching slots:", err);
-      setError("Failed to fetch slots");
-    }
-  }, [solanaProgram]);
+  }, [solanaProgram, fetchSlots]);
 
   const handleListSlot = async (slotData: {
     speedMbps: number;
