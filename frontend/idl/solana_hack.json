@@ -1,0 +1,330 @@
+{
+  "version": "0.1.0",
+  "name": "solana_hack",
+  "instructions": [
+    {
+      "name": "listBandwidth",
+      "accounts": [
+        {
+          "name": "bandwidthSlot",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "validator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "speedMbps",
+          "type": "u64"
+        },
+        {
+          "name": "startTime",
+          "type": "i64"
+        },
+        {
+          "name": "auctionEndTime",
+          "type": "i64"
+        },
+        {
+          "name": "minBid",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "bid",
+      "accounts": [
+        {
+          "name": "bandwidthSlot",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "bidder",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "prevWinner",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "escrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "bidAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "closeAuction",
+      "accounts": [
+        {
+          "name": "bandwidthSlot",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "validator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claimFunds",
+      "accounts": [
+        {
+          "name": "bandwidthSlot",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "validator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "escrow",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "bandwidthSlot",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "validator",
+            "type": "publicKey"
+          },
+          {
+            "name": "speedMbps",
+            "type": "u64"
+          },
+          {
+            "name": "startTime",
+            "type": "i64"
+          },
+          {
+            "name": "auctionEndTime",
+            "type": "i64"
+          },
+          {
+            "name": "minBid",
+            "type": "u64"
+          },
+          {
+            "name": "winningBid",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "winner",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "closed",
+            "type": "bool"
+          },
+          {
+            "name": "claimed",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "BandwidthListed",
+      "fields": [
+        {
+          "name": "validator",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "slot",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "speedMbps",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "startTime",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "auctionEndTime",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "minBid",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "BidPlaced",
+      "fields": [
+        {
+          "name": "slot",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "bidder",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "bidAmount",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "AuctionClosed",
+      "fields": [
+        {
+          "name": "slot",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "winner",
+          "type": {
+            "option": "publicKey"
+          },
+          "index": false
+        },
+        {
+          "name": "winningBid",
+          "type": {
+            "option": "u64"
+          },
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "FundsClaimed",
+      "fields": [
+        {
+          "name": "slot",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "validator",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "amount",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "BidTooLow",
+      "msg": "Bid is too low."
+    },
+    {
+      "code": 6001,
+      "name": "AuctionClosed",
+      "msg": "Auction is already closed."
+    },
+    {
+      "code": 6002,
+      "name": "AuctionEnded",
+      "msg": "Auction has ended."
+    },
+    {
+      "code": 6003,
+      "name": "AuctionNotEnded",
+      "msg": "Auction has not ended yet."
+    },
+    {
+      "code": 6004,
+      "name": "AuctionNotClosed",
+      "msg": "Auction is not closed."
+    },
+    {
+      "code": 6005,
+      "name": "AlreadyClaimed",
+      "msg": "Funds already claimed."
+    },
+    {
+      "code": 6006,
+      "name": "NotValidator",
+      "msg": "Not the validator."
+    },
+    {
+      "code": 6007,
+      "name": "MissingRefundAccount",
+      "msg": "Missing refund account."
+    },
+    {
+      "code": 6008,
+      "name": "RefundAccountMismatch",
+      "msg": "Refund account does not match previous winner."
+    },
+    {
+      "code": 6009,
+      "name": "UnexpectedRefundAccount",
+      "msg": "Unexpected refund account provided."
+    }
+  ]
+}

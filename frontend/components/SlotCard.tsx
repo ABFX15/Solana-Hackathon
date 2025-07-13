@@ -1,78 +1,240 @@
 import React from "react";
+import { PublicKey } from "@solana/web3.js";
+import { BandwidthSlotData, SolanaProgram } from "../lib/solana-program";
 
 export interface SlotCardProps {
-  validator: string;
-  speed: number;
-  start: string;
-  end: string;
-  minBid: number;
-  currentBid: number;
-  winner: string;
-  status: "open" | "closed";
+  slotData: BandwidthSlotData;
+  publicKey: PublicKey | null;
+  onBid: (slotData: BandwidthSlotData) => void;
+  onClose?: (slotData: BandwidthSlotData) => void;
+  onClaim?: (slotData: BandwidthSlotData) => void;
+  isLoading?: boolean;
 }
 
 const SlotCard: React.FC<SlotCardProps> = ({
-  validator,
-  speed,
-  start,
-  end,
-  minBid,
-  currentBid,
-  winner,
-  status,
-}) => (
-  <div className="card glass-effect border-2 border-cyan-500/30 shadow-cyan-lg mb-6 animate-fadeIn hover:scale-[1.025] transition-transform duration-300">
-    <div className="card-body flex flex-col gap-2">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-cyan-900/40 text-cyan-300 mr-2 animate-float">
-          <svg
-            width="24"
-            height="24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-          >
-            <path d="M4 17v-2a4 4 0 014-4h8a4 4 0 014 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
+  slotData,
+  publicKey,
+  onBid,
+  onClose,
+  onClaim,
+  isLoading = false,
+}) => {
+  const { account } = slotData;
+  const isValidator = publicKey && account.validator.equals(publicKey);
+  const isWinner =
+    publicKey && account.winner && account.winner.equals(publicKey);
+  const isActive = SolanaProgram.isAuctionActive(account);
+  const canClose = SolanaProgram.canCloseAuction(account);
+  const canClaim = SolanaProgram.canClaimFunds(account);
+
+  const getStatusBadge = () => {
+    if (account.claimed) {
+      return (
+        <span className="badge bg-gradient-to-r from-green-400 to-emerald-500 text-white border-0 animate-pulse-glow">
+          ✅ Claimed
         </span>
-        <h2 className="card-title gradient-text text-2xl">Bandwidth Slot</h2>
-        <span
-          className={`badge badge-cyan uppercase ml-2 ${
-            status === "open" ? "badge-success" : "badge-error"
-          }`}
-        >
-          {status}
+      );
+    }
+    if (account.closed) {
+      return (
+        <span className="badge bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0">
+          🔒 Closed
         </span>
-      </div>
-      <div className="flex flex-wrap gap-3 text-sm">
-        <span className="badge badge-cyan">
-          <b>Validator:</b> {validator.slice(0, 8)}...
+      );
+    }
+    if (isActive) {
+      return (
+        <span className="badge bg-gradient-to-r from-green-400 to-cyan-500 text-white border-0 animate-pulse-glow">
+          ⚡ Active
         </span>
-        <span className="badge badge-cyan">
-          <b>Speed:</b> {speed} Mbps
-        </span>
-        <span className="badge badge-cyan">
-          <b>Start:</b> {start}
-        </span>
-        <span className="badge badge-cyan">
-          <b>End:</b> {end}
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-3 text-sm mt-2">
-        <span className="badge badge-warning">
-          <b>Min Bid:</b> {minBid} SOL
-        </span>
-        <span className="badge badge-success">
-          <b>Current Bid:</b> {currentBid} SOL
-        </span>
-        <span className="badge badge-cyan">
-          <b>Winner:</b> {winner === "-" ? "None" : winner.slice(0, 8) + "..."}
-        </span>
+      );
+    }
+    return (
+      <span className="badge bg-gradient-to-r from-red-400 to-pink-500 text-white border-0">
+        🔴 Ended
+      </span>
+    );
+  };
+
+  const formatAddress = (address: PublicKey) => {
+    return address.toString().slice(0, 8) + "...";
+  };
+
+  return (
+    <div className="space-card hover-lift relative overflow-hidden">
+      {/* Cosmic background effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-blue-500/5 to-cyan-500/5 rounded-xl"></div>
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 flex items-center justify-center animate-pulse-glow">
+                <span className="text-2xl">📡</span>
+              </div>
+              {isActive && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-ping"></div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-xl font-bold cosmic-text">
+                {account.speedMbps.toString()} Mbps
+              </h3>
+              <p className="text-sm text-purple-300 font-mono">
+                🛰️ Satellite #{slotData.publicKey.toString().slice(0, 8)}
+              </p>
+            </div>
+          </div>
+          {getStatusBadge()}
+        </div>
+
+        {/* Mission Info Grid */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="mission-log">
+            <div className="text-xs text-purple-300 mb-1 flex items-center gap-1">
+              <span>👨‍🚀</span>
+              <span>Commander</span>
+            </div>
+            <div className="text-sm font-mono text-cyan-300">
+              {formatAddress(account.validator)}
+            </div>
+          </div>
+          <div className="mission-log">
+            <div className="text-xs text-purple-300 mb-1 flex items-center gap-1">
+              <span>💎</span>
+              <span>Min Bid</span>
+            </div>
+            <div className="text-sm font-bold text-green-400">
+              {SolanaProgram.formatSOL(Number(account.minBid))} SOL
+            </div>
+          </div>
+          <div className="mission-log">
+            <div className="text-xs text-purple-300 mb-1 flex items-center gap-1">
+              <span>🎯</span>
+              <span>Current Bid</span>
+            </div>
+            <div className="text-sm font-bold text-yellow-400">
+              {account.winningBid
+                ? SolanaProgram.formatSOL(Number(account.winningBid))
+                : "0"}{" "}
+              SOL
+            </div>
+          </div>
+          <div className="mission-log">
+            <div className="text-xs text-purple-300 mb-1 flex items-center gap-1">
+              <span>🏆</span>
+              <span>Winner</span>
+            </div>
+            <div className="text-sm font-mono text-pink-400">
+              {account.winner ? formatAddress(account.winner) : "None"}
+            </div>
+          </div>
+        </div>
+
+        {/* Mission Timeline */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="mission-log">
+            <div className="text-xs text-purple-300 mb-1 flex items-center gap-1">
+              <span>🚀</span>
+              <span>Launch Time</span>
+            </div>
+            <div className="text-sm text-cyan-300">
+              {SolanaProgram.formatTime(Number(account.startTime))}
+            </div>
+          </div>
+          <div className="mission-log">
+            <div className="text-xs text-purple-300 mb-1 flex items-center gap-1">
+              <span>🏁</span>
+              <span>Mission End</span>
+            </div>
+            <div className="text-sm text-cyan-300">
+              {SolanaProgram.formatTime(Number(account.auctionEndTime))}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          {/* Bid Button */}
+          {isActive && !isValidator && publicKey && (
+            <button
+              className="btn-space-primary flex-1 py-3 rounded-full font-semibold"
+              onClick={() => onBid(slotData)}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="loading loading-spinner loading-sm"></span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <span>🎯</span>
+                  <span>Place Bid</span>
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Close Auction Button (Validator Only) */}
+          {isValidator && canClose && onClose && (
+            <button
+              className="btn-space-secondary flex-1 py-3 rounded-full font-semibold"
+              onClick={() => onClose(slotData)}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="loading loading-spinner loading-sm"></span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <span>🔒</span>
+                  <span>Close Mission</span>
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Claim Funds Button (Validator Only) */}
+          {isValidator && canClaim && onClaim && (
+            <button
+              className="btn-space-primary flex-1 py-3 rounded-full font-semibold animate-pulse-glow"
+              onClick={() => onClaim(slotData)}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="loading loading-spinner loading-sm"></span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <span>💎</span>
+                  <span>Claim Rewards</span>
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Status Messages */}
+          {isValidator && !canClose && !canClaim && account.closed && (
+            <div className="flex-1 text-center py-3 px-4 rounded-full bg-gradient-to-r from-gray-600 to-gray-700 border border-gray-500">
+              <span className="text-sm text-gray-300">
+                {account.claimed ? "💎 Rewards Claimed" : "🔒 Mission Closed"}
+              </span>
+            </div>
+          )}
+
+          {!isActive && !isValidator && !isWinner && (
+            <div className="flex-1 text-center py-3 px-4 rounded-full bg-gradient-to-r from-gray-600 to-gray-700 border border-gray-500">
+              <span className="text-sm text-gray-300">🏁 Mission Ended</span>
+            </div>
+          )}
+
+          {isWinner && (
+            <div className="flex-1 text-center py-3 px-4 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 animate-pulse-glow">
+              <span className="text-sm text-white font-semibold">
+                🏆 Mission Successful!
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default SlotCard;

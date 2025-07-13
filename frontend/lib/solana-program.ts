@@ -1,0 +1,183 @@
+import { AnchorProvider, Program, web3, BN, IdlAccounts } from "@coral-xyz/anchor";
+import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { SolanaHack } from "../types/solana_hack";
+import idl from "../idl/solana_hack.json";
+
+const programId = new PublicKey("59NDRZgvKZGNT8Rb3J6ShHTkJQzmnrpUZgPCxDu7M47e");
+const network = "http://127.0.0.1:8899"; // Local network
+const connection = new Connection(network, "confirmed");
+
+export type BandwidthSlot = IdlAccounts<SolanaHack>["bandwidthSlot"];
+
+export interface BandwidthSlotData {
+    publicKey: PublicKey;
+    account: BandwidthSlot;
+}
+
+interface WalletInterface {
+    publicKey: PublicKey | null;
+    signTransaction?: (tx: web3.Transaction) => Promise<web3.Transaction>;
+    signAllTransactions?: (txs: web3.Transaction[]) => Promise<web3.Transaction[]>;
+}
+
+export class SolanaProgram {
+    private program: Program<SolanaHack>;
+    private provider: AnchorProvider;
+
+    constructor(wallet: WalletInterface) {
+        this.provider = new AnchorProvider(connection, wallet, {
+            commitment: "confirmed",
+        });
+        this.program = new Program<SolanaHack>(idl as SolanaHack, programId, this.provider);
+    }
+
+    // List a new bandwidth slot
+    async listBandwidth(
+        speedMbps: number,
+        startTime: Date,
+        auctionEndTime: Date,
+        minBid: number
+    ): Promise<string> {
+        const slot = web3.Keypair.generate();
+        const minBidLamports = new BN(minBid * LAMPORTS_PER_SOL);
+
+        const tx = await this.program.methods
+            .listBandwidth(
+                new BN(speedMbps),
+                new BN(Math.floor(startTime.getTime() / 1000)),
+                new BN(Math.floor(auctionEndTime.getTime() / 1000)),
+                minBidLamports
+            )
+            .accounts({
+                bandwidthSlot: slot.publicKey,
+                validator: this.provider.wallet.publicKey,
+                systemProgram: web3.SystemProgram.programId,
+            })
+            .signers([slot])
+            .rpc();
+
+        return tx;
+    }
+
+    // Place a bid on a bandwidth slot
+    async placeBid(slotPublicKey: PublicKey, bidAmount: number): Promise<string> {
+        const bidAmountLamports = new BN(bidAmount * LAMPORTS_PER_SOL);
+        const slotAccount = await this.program.account.bandwidthSlot.fetch(slotPublicKey);
+
+        // Get escrow PDA
+        const [escrowPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("escrow"), slotPublicKey.toBuffer()],
+            this.program.programId
+        );
+
+        // Setup accounts
+        const accounts: Record<string, PublicKey> = {
+            bandwidthSlot: slotPublicKey,
+            bidder: this.provider.wallet.publicKey!,
+            escrow: escrowPda,
+            systemProgram: web3.SystemProgram.programId,
+        };
+
+        // Add previous winner if there is one
+        if (slotAccount.winner) {
+            accounts.prevWinner = slotAccount.winner;
+        }
+
+        const tx = await this.program.methods
+            .bid(bidAmountLamports)
+            .accounts(accounts)
+            .rpc();
+
+        return tx;
+    }
+
+    // Close an auction (validator only)
+    async closeAuction(slotPublicKey: PublicKey): Promise<string> {
+        const tx = await this.program.methods
+            .closeAuction()
+            .accounts({
+                bandwidthSlot: slotPublicKey,
+                validator: this.provider.wallet.publicKey,
+                systemProgram: web3.SystemProgram.programId,
+            })
+            .rpc();
+
+        return tx;
+    }
+
+    // Claim funds (validator only)
+    async claimFunds(slotPublicKey: PublicKey): Promise<string> {
+        const [escrowPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("escrow"), slotPublicKey.toBuffer()],
+            this.program.programId
+        );
+
+        const tx = await this.program.methods
+            .claimFunds()
+            .accounts({
+                bandwidthSlot: slotPublicKey,
+                validator: this.provider.wallet.publicKey,
+                escrow: escrowPda,
+                systemProgram: web3.SystemProgram.programId,
+            })
+            .rpc();
+
+        return tx;
+    }
+
+    // Get all bandwidth slots
+    async getAllSlots(): Promise<BandwidthSlotData[]> {
+        const slots = await this.program.account.bandwidthSlot.all();
+        return slots.map(slot => ({
+            publicKey: slot.publicKey,
+            account: slot.account,
+        }));
+    }
+
+    // Get a specific bandwidth slot
+    async getSlot(publicKey: PublicKey): Promise<BandwidthSlotData | null> {
+        try {
+            const account = await this.program.account.bandwidthSlot.fetch(publicKey);
+            return {
+                publicKey,
+                account,
+            };
+        } catch (error) {
+            console.error("Error fetching slot:", error);
+            return null;
+        }
+    }
+
+    // Listen for program events
+    addEventListener(eventName: string, callback: (event: unknown) => void): number {
+        return this.program.addEventListener(eventName, callback);
+    }
+
+    // Remove event listener
+    removeEventListener(listenerRef: number): void {
+        this.program.removeEventListener(listenerRef);
+    }
+
+    // Utility functions
+    static formatTime(timestamp: number): string {
+        return new Date(timestamp * 1000).toLocaleString();
+    }
+
+    static formatSOL(lamports: number): string {
+        return (lamports / LAMPORTS_PER_SOL).toFixed(4);
+    }
+
+    static isAuctionActive(slot: BandwidthSlot): boolean {
+        const now = Math.floor(Date.now() / 1000);
+        return now >= slot.startTime && now < slot.auctionEndTime && !slot.closed;
+    }
+
+    static canCloseAuction(slot: BandwidthSlot): boolean {
+        const now = Math.floor(Date.now() / 1000);
+        return now >= slot.auctionEndTime && !slot.closed;
+    }
+
+    static canClaimFunds(slot: BandwidthSlot): boolean {
+        return slot.closed && !slot.claimed;
+    }
+} 

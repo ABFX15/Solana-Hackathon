@@ -1,121 +1,558 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { Tab } from "@headlessui/react";
 import SlotCard from "../../components/SlotCard";
 import SlotListingForm from "../../components/SlotListingForm";
 import BidModal from "../../components/BidModal";
 import WalletConnect from "../../components/WalletConnect";
 import Dashboard from "../../components/Dashboard";
-import { Tab } from "@headlessui/react";
-import { useWalletPublicKey } from "../../components/useWalletPublicKey";
-
-// Demo slot data for fallback
-const demoSlot = {
-  validator: "demo-validator-1234",
-  speed: 100,
-  start: "2025-07-13T12:00",
-  end: "2025-07-13T13:00",
-  minBid: 0.1,
-  currentBid: 0.15,
-  winner: "demo-bidder-5678",
-  status: "open" as const,
-};
+import LandingPage from "../../components/LandingPage";
+import { SolanaProgram, BandwidthSlotData } from "../../lib/solana-program";
 
 export default function HomePage() {
-  const [slots, setSlots] = useState([demoSlot]);
+  const wallet = useWallet();
+  const [solanaProgram, setSolanaProgram] = useState<SolanaProgram | null>(
+    null
+  );
+  const [slots, setSlots] = useState<BandwidthSlotData[]>([]);
   const [bidModalOpen, setBidModalOpen] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<typeof demoSlot | null>(null);
-  const publicKey = useWalletPublicKey();
+  const [selectedSlot, setSelectedSlot] = useState<BandwidthSlotData | null>(
+    null
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
+  const [showLanding, setShowLanding] = useState(true);
 
-  const handleListSlot = (slot: any) => {
-    setSlots([
-      ...slots,
-      {
-        ...slot,
-        validator: publicKey || "",
-        currentBid: slot.minBid,
-        winner: "-",
-        status: "open",
-      },
-    ]);
-  };
+  // Initialize Solana program when wallet connects
+  useEffect(() => {
+    if (wallet.wallet && wallet.publicKey) {
+      setShowLanding(false);
+      const program = new SolanaProgram(wallet);
+      setSolanaProgram(program);
 
-  const handleBid = (amount: number) => {
-    if (selectedSlot) {
-      setSlots(
-        slots.map((s) =>
-          s === selectedSlot
-            ? { ...s, currentBid: amount, winner: publicKey || "" }
-            : s
-        )
+      // Setup event listeners
+      const listeners = [
+        program.addEventListener("BandwidthListed", (event) => {
+          console.log("Bandwidth listed:", event);
+          fetchSlots();
+          setSuccess("🚀 Bandwidth slot launched successfully!");
+        }),
+        program.addEventListener("BidPlaced", (event) => {
+          console.log("Bid placed:", event);
+          fetchSlots();
+          setSuccess("🎯 Bid placed successfully!");
+        }),
+        program.addEventListener("AuctionClosed", (event) => {
+          console.log("Auction closed:", event);
+          fetchSlots();
+          setSuccess("🔒 Auction closed successfully!");
+        }),
+        program.addEventListener("FundsClaimed", (event) => {
+          console.log("Funds claimed:", event);
+          fetchSlots();
+          setSuccess("💎 Funds claimed successfully!");
+        }),
+      ];
+
+      return () => {
+        // Cleanup event listeners
+        listeners.forEach((listener) => program.removeEventListener(listener));
+      };
+    } else {
+      setSolanaProgram(null);
+      setSlots([]);
+    }
+  }, [wallet.wallet, wallet.publicKey]);
+
+  // Fetch slots when program is ready
+  useEffect(() => {
+    if (solanaProgram) {
+      fetchSlots();
+    }
+  }, [solanaProgram]);
+
+  const fetchSlots = useCallback(async () => {
+    if (!solanaProgram) return;
+
+    try {
+      const allSlots = await solanaProgram.getAllSlots();
+      setSlots(allSlots);
+    } catch (err: unknown) {
+      console.error("Error fetching slots:", err);
+      setError("Failed to fetch slots");
+    }
+  }, [solanaProgram]);
+
+  const handleListSlot = async (slotData: {
+    speedMbps: number;
+    startTime: Date;
+    auctionEndTime: Date;
+    minBid: number;
+  }) => {
+    if (!solanaProgram) {
+      setError("Please connect your wallet first");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const tx = await solanaProgram.listBandwidth(
+        slotData.speedMbps,
+        slotData.startTime,
+        slotData.auctionEndTime,
+        slotData.minBid
       );
-      setBidModalOpen(false);
+
+      console.log("Transaction signature:", tx);
+
+      // Wait a bit then refetch slots
+      setTimeout(fetchSlots, 2000);
+    } catch (err: unknown) {
+      console.error("Error listing slot:", err);
+      setError((err as Error).message || "Failed to list slot");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#18181b] via-[#23233a] to-[#1a1a2e] text-white">
-      {/* Top nav */}
-      <nav className="flex items-center justify-between px-8 py-4 bg-black/60 shadow-lg sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-purple-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">Solana Bandwidth Auction</span>
-        </div>
-        <WalletConnect />
-      </nav>
+  const handleBid = async (amount: number) => {
+    if (!solanaProgram || !selectedSlot) {
+      setError("Please connect your wallet first");
+      return;
+    }
 
-      <main className="max-w-4xl mx-auto p-6 flex flex-col gap-8">
-        <Tab.Group>
-          <Tab.List className="flex space-x-2 rounded-xl bg-black/30 p-1 mb-6">
-            <Tab className={({ selected }) =>
-              `w-full py-2.5 text-sm leading-5 font-semibold rounded-lg
-              ${selected ? 'bg-gradient-to-r from-purple-500 to-cyan-500 text-white shadow' : 'text-cyan-200 hover:bg-black/40 hover:text-white'}`
-            }>Dashboard</Tab>
-            <Tab className={({ selected }) =>
-              `w-full py-2.5 text-sm leading-5 font-semibold rounded-lg
-              ${selected ? 'bg-gradient-to-r from-purple-500 to-cyan-500 text-white shadow' : 'text-cyan-200 hover:bg-black/40 hover:text-white'}`
-            }>List Slot</Tab>
-            <Tab className={({ selected }) =>
-              `w-full py-2.5 text-sm leading-5 font-semibold rounded-lg
-              ${selected ? 'bg-gradient-to-r from-purple-500 to-cyan-500 text-white shadow' : 'text-cyan-200 hover:bg-black/40 hover:text-white'}`
-            }>Auctions</Tab>
-          </Tab.List>
-          <Tab.Panels>
-            <Tab.Panel>
-              <Dashboard publicKey={publicKey} slots={slots} />
-            </Tab.Panel>
-            <Tab.Panel>
-              <SlotListingForm onList={handleListSlot} />
-            </Tab.Panel>
-            <Tab.Panel>
-              <h2 className="text-xl font-semibold mb-2">Available Bandwidth Slots</h2>
-              {slots.length === 0 ? (
-                <div className="alert alert-warning">No slots found. Showing demo slot.</div>
-              ) : null}
-              <div className="flex flex-col gap-4">
-                {slots.map((slot, i) => (
-                  <div key={i} className="">
-                    <SlotCard {...slot} />
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const tx = await solanaProgram.placeBid(selectedSlot.publicKey, amount);
+
+      console.log("Bid transaction signature:", tx);
+
+      // Wait a bit then refetch slots
+      setTimeout(fetchSlots, 2000);
+    } catch (err: unknown) {
+      console.error("Error placing bid:", err);
+      setError((err as Error).message || "Failed to place bid");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCloseAuction = async (slotData: BandwidthSlotData) => {
+    if (!solanaProgram) {
+      setError("Please connect your wallet first");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const tx = await solanaProgram.closeAuction(slotData.publicKey);
+
+      console.log("Close auction transaction signature:", tx);
+
+      // Wait a bit then refetch slots
+      setTimeout(fetchSlots, 2000);
+    } catch (err: unknown) {
+      console.error("Error closing auction:", err);
+      setError((err as Error).message || "Failed to close auction");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClaimFunds = async (slotData: BandwidthSlotData) => {
+    if (!solanaProgram) {
+      setError("Please connect your wallet first");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const tx = await solanaProgram.claimFunds(slotData.publicKey);
+
+      console.log("Claim funds transaction signature:", tx);
+
+      // Wait a bit then refetch slots
+      setTimeout(fetchSlots, 2000);
+    } catch (err: unknown) {
+      console.error("Error claiming funds:", err);
+      setError((err as Error).message || "Failed to claim funds");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBidClick = (slotData: BandwidthSlotData) => {
+    setSelectedSlot(slotData);
+    setBidModalOpen(true);
+  };
+
+  const clearMessages = () => {
+    setError("");
+    setSuccess("");
+  };
+
+  const handleGetStarted = () => {
+    setShowLanding(false);
+  };
+
+  // Auto-refresh slots every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchSlots, 30000);
+    return () => clearInterval(interval);
+  }, [fetchSlots]);
+
+  // Show landing page if not connected
+  if (showLanding && !wallet.publicKey) {
+    return <LandingPage onGetStarted={handleGetStarted} />;
+  }
+
+  // Sort slots by auction end time
+  const sortedSlots = [...slots].sort((a, b) => {
+    const aActive = SolanaProgram.isAuctionActive(a.account);
+    const bActive = SolanaProgram.isAuctionActive(b.account);
+
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+
+    return Number(a.account.auctionEndTime) - Number(b.account.auctionEndTime);
+  });
+
+  const activeSlots = sortedSlots.filter((slot) =>
+    SolanaProgram.isAuctionActive(slot.account)
+  );
+  const endedSlots = sortedSlots.filter(
+    (slot) => !SolanaProgram.isAuctionActive(slot.account)
+  );
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-black text-white relative overflow-hidden">
+      {/* Animated Space Background */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="stars"></div>
+        <div className="twinkling"></div>
+        <div className="clouds"></div>
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Navigation */}
+        <nav className="bg-black/40 backdrop-blur-md border-b border-purple-500/30 sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 flex items-center justify-center animate-pulse-glow">
+                  <span className="text-2xl">🛸</span>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold cosmic-text">
+                    Solana Bandwidth Exchange
+                  </h1>
+                  <p className="text-xs text-purple-300">
+                    Decentralized Bandwidth Marketplace
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowLanding(true)}
+                  className="text-sm text-purple-300 hover:text-purple-200 transition-colors"
+                >
+                  🏠 Home
+                </button>
+                <WalletConnect />
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        {/* Messages */}
+        {(error || success) && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+            {error && (
+              <div className="alert alert-error mb-4 space-alert">
+                <svg
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <span>{error}</span>
+                <button
+                  onClick={clearMessages}
+                  className="btn btn-sm btn-circle btn-ghost"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            {success && (
+              <div className="alert alert-success mb-4 space-card">
+                <svg
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{success}</span>
+                <button
+                  onClick={clearMessages}
+                  className="btn btn-sm btn-circle btn-ghost"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Tab.Group>
+            <Tab.List className="flex space-x-1 rounded-2xl bg-black/40 backdrop-blur-md p-1 mb-8 border border-purple-500/30">
+              <Tab
+                className={({ selected }) =>
+                  `w-full rounded-xl py-3 px-4 text-sm font-medium leading-5 transition-all duration-300
+                ${
+                  selected
+                    ? "bg-gradient-to-r from-purple-500 to-cyan-500 text-white shadow-lg transform scale-105"
+                    : "text-purple-200 hover:bg-white/[0.12] hover:text-white"
+                }`
+                }
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <span>🚀</span>
+                  <span>Mission Control</span>
+                </div>
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `w-full rounded-xl py-3 px-4 text-sm font-medium leading-5 transition-all duration-300
+                ${
+                  selected
+                    ? "bg-gradient-to-r from-purple-500 to-cyan-500 text-white shadow-lg transform scale-105"
+                    : "text-purple-200 hover:bg-white/[0.12] hover:text-white"
+                }`
+                }
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <span>📡</span>
+                  <span>Launch Satellite</span>
+                </div>
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `w-full rounded-xl py-3 px-4 text-sm font-medium leading-5 transition-all duration-300
+                ${
+                  selected
+                    ? "bg-gradient-to-r from-purple-500 to-cyan-500 text-white shadow-lg transform scale-105"
+                    : "text-purple-200 hover:bg-white/[0.12] hover:text-white"
+                }`
+                }
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <span>⚡</span>
+                  <span>Active Missions ({activeSlots.length})</span>
+                </div>
+              </Tab>
+              <Tab
+                className={({ selected }) =>
+                  `w-full rounded-xl py-3 px-4 text-sm font-medium leading-5 transition-all duration-300
+                ${
+                  selected
+                    ? "bg-gradient-to-r from-purple-500 to-cyan-500 text-white shadow-lg transform scale-105"
+                    : "text-purple-200 hover:bg-white/[0.12] hover:text-white"
+                }`
+                }
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <span>🌌</span>
+                  <span>All Missions ({slots.length})</span>
+                </div>
+              </Tab>
+            </Tab.List>
+
+            <Tab.Panels>
+              {/* Dashboard */}
+              <Tab.Panel>
+                <Dashboard
+                  publicKey={wallet.publicKey}
+                  slots={slots}
+                  isLoading={isLoading}
+                />
+              </Tab.Panel>
+
+              {/* List Bandwidth */}
+              <Tab.Panel>
+                <SlotListingForm
+                  onList={handleListSlot}
+                  isLoading={isLoading}
+                />
+              </Tab.Panel>
+
+              {/* Active Auctions */}
+              <Tab.Panel>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-3xl font-bold cosmic-text">
+                      ⚡ Active Space Missions
+                    </h2>
                     <button
-                      className="btn btn-primary btn-sm mb-4"
-                      onClick={() => {
-                        setSelectedSlot(slot);
-                        setBidModalOpen(true);
-                      }}
+                      onClick={fetchSlots}
+                      className="btn-space-secondary px-6 py-2 rounded-full text-sm"
+                      disabled={isLoading}
                     >
-                      Bid
+                      {isLoading ? (
+                        <span className="loading loading-spinner loading-sm"></span>
+                      ) : (
+                        "🔄 Refresh"
+                      )}
                     </button>
                   </div>
-                ))}
-              </div>
-            </Tab.Panel>
-          </Tab.Panels>
-        </Tab.Group>
-        <BidModal
-          open={bidModalOpen}
-          onClose={() => setBidModalOpen(false)}
-          onBid={handleBid}
-          minBid={selectedSlot?.minBid || 0.1}
-        />
-      </main>
+
+                  {activeSlots.length === 0 ? (
+                    <div className="text-center py-16">
+                      <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-500/20 to-cyan-500/20 flex items-center justify-center">
+                        <span className="text-6xl">🌌</span>
+                      </div>
+                      <h3 className="text-2xl font-semibold text-purple-300 mb-4">
+                        No Active Missions
+                      </h3>
+                      <p className="text-gray-400">
+                        The space is quiet... no active bandwidth auctions at
+                        the moment.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {activeSlots.map((slot) => (
+                        <SlotCard
+                          key={slot.publicKey.toString()}
+                          slotData={slot}
+                          publicKey={wallet.publicKey}
+                          onBid={handleBidClick}
+                          onClose={handleCloseAuction}
+                          onClaim={handleClaimFunds}
+                          isLoading={isLoading}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Tab.Panel>
+
+              {/* All Auctions */}
+              <Tab.Panel>
+                <div className="space-y-8">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-3xl font-bold cosmic-text">
+                      🌌 All Space Missions
+                    </h2>
+                    <button
+                      onClick={fetchSlots}
+                      className="btn-space-secondary px-6 py-2 rounded-full text-sm"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <span className="loading loading-spinner loading-sm"></span>
+                      ) : (
+                        "🔄 Refresh"
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Active Auctions Section */}
+                  {activeSlots.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-semibold text-green-400 mb-6 flex items-center gap-2">
+                        <span>⚡</span>
+                        <span>Active Missions</span>
+                      </h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+                        {activeSlots.map((slot) => (
+                          <SlotCard
+                            key={slot.publicKey.toString()}
+                            slotData={slot}
+                            publicKey={wallet.publicKey}
+                            onBid={handleBidClick}
+                            onClose={handleCloseAuction}
+                            onClaim={handleClaimFunds}
+                            isLoading={isLoading}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ended Auctions Section */}
+                  {endedSlots.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-400 mb-6 flex items-center gap-2">
+                        <span>🏁</span>
+                        <span>Completed Missions</span>
+                      </h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {endedSlots.map((slot) => (
+                          <SlotCard
+                            key={slot.publicKey.toString()}
+                            slotData={slot}
+                            publicKey={wallet.publicKey}
+                            onBid={handleBidClick}
+                            onClose={handleCloseAuction}
+                            onClaim={handleClaimFunds}
+                            isLoading={isLoading}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {slots.length === 0 && !isLoading && (
+                    <div className="text-center py-16">
+                      <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-500/20 to-cyan-500/20 flex items-center justify-center">
+                        <span className="text-6xl">🚀</span>
+                      </div>
+                      <h3 className="text-2xl font-semibold text-purple-300 mb-4">
+                        No Missions Yet
+                      </h3>
+                      <p className="text-gray-400">
+                        Be the first space explorer to launch a bandwidth
+                        satellite!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </Tab.Panel>
+            </Tab.Panels>
+          </Tab.Group>
+        </main>
+      </div>
+
+      {/* Bid Modal */}
+      <BidModal
+        open={bidModalOpen}
+        onClose={() => setBidModalOpen(false)}
+        onBid={handleBid}
+        slotData={selectedSlot}
+        isLoading={isLoading}
+      />
     </div>
   );
 }
